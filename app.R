@@ -1,0 +1,257 @@
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
+library(shiny)
+library(ggplot2)
+
+# Define the core functions that do the heavy processing
+
+population <- function(mean = 0, sd = 1, size = 10e3, type = "normal") {
+	# creates a population with given parameters
+
+	# types
+	if (type == "normal") {
+		pop <- rnorm(size, mean, sd) # n = size, mean = mean, sd = sd
+	} else if (type == "bin") {
+		pop <- rbinom(size, sd, mean) # n = size, size = sd,  prob = mean
+	} else if (type == "poisson") {
+		pop <- rpois(size, mean) # n = size, lambda = mean
+	} else if (type == "gamma") {
+		pop <- rgamma(size, mean)
+	} else if (type == "sigma") {
+		pop < rlogis(size, log(mean), log(sd))
+	} else if (type == "log") {
+		pop <- rlnorm(size, log(mean), log(sd))
+	} else if (type == "exp") {
+		pop <- rexp(size, mean)
+	} else {
+		pop <- runif(size) # uniform
+	}
+
+	return(pop)
+}
+
+resample <- function(population, size = 100, times = 100)	{
+	# returns a collection of non bootstraped samples from the population
+	return(replicate(times,
+			 sample(x = population,
+			        size = size)))
+}
+
+
+plot.sample <-  function(population, size = 100) {
+	s <- resample(population, size, times = 1)
+	g <- qplot(x = s,
+		   geom = "density",
+		   main = "Sample Distribution for 10% of the population",
+		   ylab = "Frequency",
+		   xlab = "Range") + theme_minimal()
+	g
+}
+
+plot.pop <-  function(population) {
+	g <- qplot(x = population,
+		   geom = "density",
+		   main = "Population Distribution",
+		   ylab = "Frequency",
+		   xlab = "Range") + theme_minimal()
+	g
+}
+
+plot.clt <-  function(resamples) {
+	g <- qplot(x = apply(resamples, 2, mean),
+		   geom = "density",
+		   main = "Sample Mean Distribution",
+		   ylab = "Frequency",
+		   xlab = "Range")  + theme_minimal()
+	g
+}
+
+# Define UI for application that draws a histogram
+ui <- fluidPage(
+	titlePanel("The Central Limit Theorem"),
+
+	# Population panel
+	sidebarLayout(position = "left",
+
+		      mainPanel(
+		      	p("Here we shall make a quick and simple demonstration of how the Central Limit Theorem works under a number of circunstances."),
+
+		      	h1("Creating data"),
+
+		      	p("First, use the side panel parameters to create a synthetic population of your own. Below, we have the graph for the given population."),
+
+		      	p("The population follows the distribution selected in the sidepanel. Additionaly, the summary of the population is given below the graph. This values are log transformed for exponential, lognormal and logistic."),
+
+		      	plotOutput("plot.pop"),
+
+		      	p("Population Summary:"),
+
+		      	tableOutput("pop.summary"),
+
+		      	h1("The Sample Effect"),
+
+		      	p("However, if one takes a sample from the population. There is no guarantee that the sample would follow the properties of the same population. In fact, it usually has a faint inherited behaviour from the population for larger sizes or it has it's own distribution."),
+
+		      	plotOutput("plot.sample"),
+
+		      	p("Single Sample Summary:"),
+
+		      	tableOutput("sample.summary"),
+
+		      	p("So let us create multiple samples from the given population."),
+
+		      	p()
+
+		      ),
+
+		      sidebarPanel(
+		      	helpText("Choose distribuiton parameters:"),
+
+		      	numericInput("mean",
+		      		     label = "Population Mean",
+		      		     value = 0),
+
+		      	numericInput("sd",
+		      		     label = "Population Standard Deviation",
+		      		     value = 1),
+
+		      	sliderInput("size",
+		      		    label = "Population Size",
+		      		    min = 1e1,
+		      		    max = 1e6,
+		      		    value = 100),
+
+		      	radioButtons("type", label = "Population Type",
+		      		     choices = list(normal = "normal",
+		      		     	       poisson = "poisson",
+		      		     	       exponential = "exp",
+		      		     	       lognormal = "log",
+		      		     	       logistic = "sigma",
+		      		     	       gamma = "gamma",
+		      		     	       random = ""),
+		      		     selected = "")
+		      )
+	),
+
+
+	# Resample panel
+	sidebarLayout(position = "right",
+
+		      sidebarPanel(
+		      	helpText("Choose sample parameters:"),
+
+		      	sliderInput("sample_size",
+		      		    label = "Sample Size (a fraction of the population)",
+		      		    min = .01,
+		      		    max = 1,
+		      		    value = .1),
+
+		      	sliderInput("replications",
+		      		    label = "Number of Samples (replications)",
+		      		    min = 1,
+		      		    max = 1e3,
+		      		    value = 100)
+		      ),
+
+		      mainPanel(
+
+		      	h1("Creating Samples"),
+
+		      	p("Here we have the distribution of the means of the samples created from the population. Since the sampling error always follows a normal distribution, 'the means of the means' also follow a normal distribution."),
+
+		      	p("Use the sample parameters to adjust the samples as fraction of the original population (10% is enough) and the number of samples. Usually the number of samples causes the simulation to converge into normal quickier than the sample size."),
+
+
+		      	plotOutput("plot.clt"),
+
+		      	p("CLT Summary:"),
+
+		      	tableOutput("clt.summary")
+		      )
+	)
+)
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+	# population distribution
+	output$plot.pop <- renderPlot({
+		# create population
+		pop <<- population(mean = input$mean,
+				   sd = input$sd,
+				   size = input$size,
+				   type = input$type)
+
+		# plot distribution
+		plot.pop(pop)
+	})
+
+	# sample distribution
+	output$plot.sample <- renderPlot({
+		# population update control
+		input$mean; input$sd; input$size; input$type
+
+		# plot distribution
+		plot.sample(population = pop,
+			    size = trunc(length(pop) * .05))
+	})
+
+	# clt distribution
+	output$plot.clt <- renderPlot({
+		# update control
+		input$mean; input$sd; input$size; input$type
+
+		# create resamples
+		res <<- resample(population = pop,
+				 size = trunc(length(pop) * input$sample_size),
+				 times = input$replications)
+
+		# plot distribution
+		plot.clt(res)
+	})
+
+	# popularion summary
+	output$pop.summary <- renderTable({
+		# update control
+		input$mean; input$sd; input$size; input$type
+
+		# summary
+		data.frame(mean = mean(pop),
+			   sd = sd(pop))
+	})
+
+	# single sample summary
+	output$sample.summary <- renderTable({
+		# update control
+		input$mean; input$sd; input$size; input$type
+
+		# summary
+		data.frame(mean = mean(sample(pop, 100)),
+			   sd = sd(sample(pop, 100)))
+	})
+
+	# clt summary
+	output$clt.summary <- renderTable({
+		# resample update control
+		input$mean; input$sd; input$size; input$type
+
+		# resample update control
+		input$sample_size; input$replications
+
+		# summary
+		data.frame("Population mean" = mean(pop),
+			   "Population SD" = sd(pop),
+			   "Samples Mean" = mean(apply(res, 2, mean)),
+			   "Samples SD" = mean(apply(res, 2, sd)))
+	})
+
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+
