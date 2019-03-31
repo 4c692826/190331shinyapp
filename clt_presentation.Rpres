@@ -1,0 +1,58 @@
+A practical introduction to the Central Limit Theorem
+========================================================
+author: Bruno
+date: 31/03/2019
+autosize: true
+
+The Theorem
+========================================================
+
+The Central Limit  is considered one of the most imporant conceps in inferential statistics. It allows the data scientist to make inferences on data whose internal probability distribution is still unknow with easy and robustness.
+
+- Allows inference on any kind of population
+- Allows to infer both mean, standard deviation, proportions and differences with the same principle
+
+A Demonstration
+========================================================
+Consider a random population of numbers. This population is supposed to be the typical distribution of lottery numbers. This population is not normally distributed.
+
+```{r echo = FALSE, fig.height = 4, fig.width = 6}
+# random population
+pop <- runif(1e4)
+
+# graph
+library(ggplot2)
+
+qplot(pop, geom = "density")
+```
+
+True Population Mean: `r mean(pop)`
+
+The Problem with samples
+========================================================
+However, if someone makes a sample from such population the sample has its own distribution. The usual solution to this issue would be to create bigger samples but this costy.
+
+```{r echo = FALSE, fig.height = 4, fig.width = 6}
+# sample
+s <- sample(pop, 1e2)
+
+qplot(s, geom = "density")
+```
+
+Sample Mean: `r mean(s)`
+
+Inference
+========================================================
+Thanks to CLT, it is possible to infer the true population mean and other metrics from the samples, since the error for such estimation is normally distributed, no matter the distribution of the population.
+
+```{r echo = FALSE}
+# confidence test
+print("Confidence Interval for the Sample:")
+test <- t.test(s)
+test$conf.int
+
+print("Means of Means of 100 samples:")
+# bootstraping test
+mean(apply(replicate(100, sample(pop, 10)), 2, mean))
+```
+
